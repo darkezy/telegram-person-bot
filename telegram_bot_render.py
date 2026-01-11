@@ -4,7 +4,7 @@
 بوت وزنة مصاريف - نسخة محسّنة مع دعم إرسال الصور
 """
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 import logging
 import os
 from threading import Thread
@@ -28,6 +28,10 @@ WEBAPP_URL = os.environ.get('WEBAPP_URL', 'https://your-webapp-url.com')
 if not BOT_TOKEN:
     logger.error("❌ BOT_TOKEN غير موجود")
     exit(1)
+
+if WEBAPP_URL == 'https://your-webapp-url.com':
+    logger.warning("⚠️ تحذير: WEBAPP_URL لم يتم تعيينه! استخدم الرابط الصحيح لتطبيق الويب")
+    logger.warning("⚠️ قم بتعيين WEBAPP_URL في متغيرات البيئة على Render")
 
 # ================== HTTP Health Check ==================
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -55,7 +59,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # إنشاء لوحة مفاتيح مع زر Web App
     keyboard = [
         [InlineKeyboardButton(
-            "💰 فتح تطبيق وزنة مصاريف",
+            "💰 فتح تطبيق تحليل مبسط",
             web_app=WebAppInfo(url=WEBAPP_URL)
         )],
         [InlineKeyboardButton(
@@ -66,11 +70,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.effective_message.reply_text(
-        "✅ *أهلاً بك في تطبيق وزنة مصاريف!*\n\n"
+        "✅ *أهلاً بك في تطبيق تحليل مبسط!*\n\n"
         "📊 *المميزات:*\n"
         "• تحليل الدخل والمصاريف\n"
         "• تقارير شهرية وسنوية\n"
-        "• تحليل موقف الأسرة المالي\n"
+        "• تحليل الموقف المالي\n"
         "• حفظ التقارير كصور\n\n"
         "📱 *للبدء:*\n"
         "اضغط على الزر أدناه لفتح التطبيق\n\n"
@@ -136,17 +140,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     help_text = """
-📖 *دليل استخدام تطبيق وزنة مصاريف*
+📖 *دليل استخدام تطبيق تحليل مبسط*
 
 *1️⃣ فتح التطبيق:*
-اضغط على زر "فتح تطبيق وزنة مصاريف"
+اضغط على زر "فتح تطبيق تحليل مبسط"
 
 *2️⃣ إدخال البيانات:*
 • أدخل مصادر دخلك في تبويب "مصادر الدخل"
-• أدخل مصاريفك في تبويب "ميزانية الأسرة"
+• أدخل مصاريفك في تبويب "الميزانية"
 
 *3️⃣ عرض التحليل:*
-افتح تبويب "تحليل موقف الأسرة" لرؤية التقييم
+افتح تبويب "تحليل الموقف" لرؤية التقييم
 
 *4️⃣ حفظ التقرير:*
 اضغط زر "حفظ صورة" في أي تبويب
@@ -171,10 +175,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 للمساعدة، تواصل مع المطور
 """
     
-    await update.effective_message.reply_text(
-        help_text,
-        parse_mode="Markdown"
-    )
+    # التحقق إذا كان callback أو command
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(
+            help_text,
+            parse_mode="Markdown"
+        )
+    else:
+        await update.effective_message.reply_text(
+            help_text,
+            parse_mode="Markdown"
+        )
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -195,6 +207,9 @@ def main():
     # إضافة المعالجات
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    
+    # معالج زر المساعدة
+    application.add_handler(CallbackQueryHandler(help_command, pattern="^help$"))
     
     # معالج بيانات Web App (اختياري - للاستخدام المستقبلي)
     application.add_handler(MessageHandler(
